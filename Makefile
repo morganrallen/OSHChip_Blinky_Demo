@@ -44,6 +44,7 @@ CPU := cortex-m0
 
 # Toolchain commands
 CC       := $(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-gcc
+GDB       := $(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-gdb
 AS       := $(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-as
 AR       := $(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-ar -r
 LD       := $(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-ld
@@ -223,7 +224,7 @@ MAIN_BIN = $(SOFTDEVICE_OUTPUT:.hex=_mainpart.bin)
 UICR_BIN = $(SOFTDEVICE_OUTPUT:.hex=_uicr.bin)
 
 PYOCD_FLASH = sudo pyocd-flashtool
-PYOCD_GDB = pyocd-gdbserver
+PYOCD_GDB = sudo pyocd-gdbserver
 
 flash: all
 	$(PYOCD_FLASH) $(HEX)
@@ -239,10 +240,11 @@ endif
 erase-all:
 	$(PYOCD_FLASH) -ce
 
-startdebug: debug-gdbinit
-	$(PYOCD_GDB)
+gdb:
+	@echo $(GDB) -x .gdbinit $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
+	$(GDB) -x .gdbinit $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
 
-debug-gdbinit:
-	printf "target remote localhost:$(GDB_PORT_NUMBER)\nbreak main\n" > .gdbinit
+startdebug:
+	$(PYOCD_GDB) -o -t nrf51
 
 .PHONY: flash flash-softdevice erase-all startdebug
