@@ -21,5 +21,6 @@ screen
 make startdebug
 [CTRL-a n] # switch to next buffer
 make gdb
+```
 
 [pyOCD]: https://github.com/mbedmicro/pyOCD
