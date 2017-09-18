@@ -6,6 +6,7 @@
 #include "nrf_delay.h"
 #include "nrf_gpio.h"
 #include "boards.h"
+#include "nrf.h"
 
 int leds[] = { LED_RED, LED_GREEN, LED_BLUE };
 

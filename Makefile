@@ -1,6 +1,6 @@
 DEVICE := NRF51
 DEVICESERIES := nrf51
-TARGET_CHIP := NRF51822_QFAA_CA
+TARGET_CHIP := NRF51822
 BOARD	:= BOARD_CUSTOM
 OUTPUT_FILENAME = $(shell basename "$(realpath ../)")
 DEVICE_VARIANT := common
@@ -9,7 +9,7 @@ GNU_INSTALL_ROOT := /usr
 GNU_VERSION := 4.9.3
 GNU_PREFIX := arm-none-eabi
 
-NRF_SDK_PATH ?= /vagrant/devel/nRF5_SDK_11/
+NRF_SDK_PATH ?= /vagrant/devel/nRF5_SDK_12.3.0_d7731ad/
 SDK_INCLUDE_PATH = $(NRF_SDK_PATH)
 SDK_SOURCE_PATH = $(NRF_SDK_PATH)
 
@@ -60,10 +60,10 @@ LISTING_DIRECTORY := _build
 OUTPUT_BINARY_DIRECTORY := _build
 
 # build bare-bone bootloader
-C_SOURCE_FILES += system_$(DEVICESERIES).c
-C_SOURCE_FILES += nrf_delay.c
 C_SOURCE_FILES += src/main.c
-ASSEMBLER_SOURCE_FILES += gcc_startup_$(DEVICESERIES).s
+C_SOURCE_FILES += $(NRF_SDK_PATH)/components/toolchain/system_$(DEVICESERIES).c
+
+ASSEMBLER_SOURCE_FILES += $(NRF_SDK_PATH)/components/toolchain/gcc/gcc_startup_$(DEVICESERIES).S
 
 # Linker flags
 LDFLAGS += -L"$(NRF_SDK_PATH)components/toolchain/gcc/"
@@ -85,10 +85,16 @@ ASMFLAGS += -x assembler-with-cpp
 
 INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/drivers_nrf/delay"
 INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/drivers_nrf/hal"
+INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/drivers_nrf/clock"
+INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/drivers_nrf/common"
 INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/device"
+INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/softdevice/s130/headers"
+INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/libraries/util/"
+INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/libraries/timer/"
 INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/toolchain/gcc"
 INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/toolchain"
-INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/toolchain/CMSIS/Include"
+INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/toolchain/cmsis/include"
+INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)components/boards"
 INCLUDEPATHS += -I"$(SDK_INCLUDE_PATH)examples/bsp"
 INCLUDEPATHS += -I"./include/"
 INCLUDEPATHS += -I"./src/"
@@ -123,7 +129,7 @@ endif
 ASSEMBLER_SOURCE_PATHS = ../ $(SDK_SOURCE_PATH) $(wildcard $(SDK_SOURCE_PATH)*/)
 
 C_OBJECTS = $(addprefix $(OBJECT_DIRECTORY)/, $(C_SOURCE_FILENAMES:.c=.o) )
-ASSEMBLER_OBJECTS = $(addprefix $(OBJECT_DIRECTORY)/, $(ASSEMBLER_SOURCE_FILENAMES:.s=.o) )
+ASSEMBLER_OBJECTS = $(addprefix $(OBJECT_DIRECTORY)/, $(ASSEMBLER_SOURCE_FILENAMES:.S=.o) )
 
 C_SOURCE_PATHS += $(SDK_INCLUDE_PATH)components/drivers_nrf/delay
 C_SOURCE_PATHS += $(SDK_INCLUDE_PATH)components/toolchain
@@ -131,7 +137,7 @@ ASSEMBLER_SOURCE_PATHS += $(SDK_INCLUDE_PATH)components/toolchain/gcc
 
 # Set source lookup paths
 vpath %.c $(C_SOURCE_PATHS)
-vpath %.s $(ASSEMBLER_SOURCE_PATHS)
+vpath %.S $(ASSEMBLER_SOURCE_PATHS)
 
 # Include automatically previously generated dependencies
 -include $(addprefix $(OBJECT_DIRECTORY)/, $(COBJS:.o=.d))
@@ -148,6 +154,8 @@ release:  ASMFLAGS += -DNDEBUG -O3
 release:  $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).bin $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex
 
 echostuff:
+	@echo "NRF_SDK_PATH [$(NRF_SDK_PATH)]"
+	@echo ""
 	@echo "CC      [$(CC)]"
 	@echo "AS      [$(AS)]"
 	@echo "AR      [$(AR)]"
@@ -158,18 +166,20 @@ echostuff:
 	@echo ""
 	@echo ASSEMBLER_SOURCE_FILES [$(ASSEMBLER_SOURCE_FILES)]
 	@echo ""
-	@echo C_SOURCE_FILENAMES: [$(C_SOURCE_FILENAMES)]
-	@echo C_OBJECTS: [$(C_OBJECTS)]
 	@echo C_SOURCE_FILES: [$(C_SOURCE_FILES)]
 	@echo C_SOURCE_FILENAMES: [$(C_SOURCE_FILENAMES)]
 	@echo C_SOURCE_PATHS [$(C_SOURCE_PATHS)]
 	@echo ""
+	@echo C_OBJECTS: [$(C_OBJECTS)]
+	@echo ""
 	@echo SDK_SOURCE_PATH [$(SDK_SOURCE_PATH)]
 	@echo ""
-	@echo "NRF_SDK_PATH [$(NRF_SDK_PATH)]"
 	@echo "SDK_INCLUDE_PATH [$(SDK_INCLUDE_PATH)]"
 	@echo ""
 	@echo "LDFLAGS [$(LDFLAGS)]"
+	@echo ""
+	@echo "CFLAGS [$(CFLAGS)]"
+	@echo ""
 	@echo "INCLUDEPATHS [$(INCLUDEPATHS)]"
 	@echo ""
 
@@ -183,8 +193,8 @@ $(OBJECT_DIRECTORY)/%.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDEPATHS) -M $< -MF "$(@:.o=.d)" -MT $@
 	$(CC) $(CFLAGS) $(INCLUDEPATHS) -c -o $@ $<
 
-## Assemble .s files
-$(OBJECT_DIRECTORY)/%.o: %.s
+## Assemble .S files
+$(OBJECT_DIRECTORY)/%.o: %.S
 	@echo $(OBJECT_DIRECTORY)/$@
 	$(CC) $(ASMFLAGS) $(INCLUDEPATHS) -c -o $@ $<
 
@@ -210,7 +220,7 @@ all: clean debug
 
 clean:
 	rm -rf $(OUTPUT_BINARY_DIRECTORY)
-	rm -f .gdbinit
+	rm -f gdbinit
 
 HEX = $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex
 ELF = $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
@@ -241,8 +251,8 @@ erase-all:
 	$(PYOCD_FLASH) -ce
 
 gdb:
-	@echo $(GDB) -x .gdbinit $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
-	$(GDB) -x .gdbinit $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
+	@echo $(GDB) -x gdbinit $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
+	$(GDB) -x gdbinit $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
 
 startdebug:
 	$(PYOCD_GDB) -o -t nrf51
